@@ -257,6 +257,17 @@ io.on('connection', (socket) => {
         io.emit('receive_message', msg);
     });
 
+    // --- IN-GAME ARENA CHAT ---
+    // handles live messaging between the two active players in a room
+    socket.on('send_game_message', (data) => {
+        const msg = {
+            username: data.username || username,
+            message: data.message,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        io.to(data.roomId).emit('receive_game_message', msg);
+    });
+
     // --- CREATE ROOM ---
     socket.on('create_room', async (data) => {
         const sizeStr = data.gridSize || '10x10';

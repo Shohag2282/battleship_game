@@ -1912,3 +1912,134 @@ input:checked + .slider {
     line-height: 1 !important;
     text-align: left !important;
 }
+
+/* --- IN-GAME ARENA LIVE CHAT & SIDEBAR --- */
+.game-sidebar {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 20px !important;
+    width: 320px !important;
+}
+
+.game-sidebar .battle-log-panel {
+    height: 240px !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.game-sidebar .log-messages {
+    flex: 1 !important;
+    overflow-y: auto !important;
+}
+
+.battle-chat-panel {
+    background-color: #fff4e6 !important;
+    border: 5px solid #8e2b60 !important;
+    border-radius: 22px !important;
+    box-shadow: 0 8px 0 #5f1840 !important;
+    padding: 20px !important;
+    font-family: 'Fredoka', sans-serif !important;
+    display: flex !important;
+    flex-direction: column !important;
+    height: 310px !important;
+}
+
+.battle-chat-panel h3 {
+    color: #fff !important;
+    font-family: 'Fredoka', sans-serif !important;
+    font-weight: 800 !important;
+    font-size: 1.3rem !important;
+    text-shadow: -2px -2px 0 #8e2b60, 2px -2px 0 #8e2b60, -2px 2px 0 #8e2b60, 2px 2px 0 #8e2b60, 0 3px 0 #5f1840 !important;
+    border-bottom: 2px solid #ebd8c8 !important;
+    padding-bottom: 8px !important;
+    margin-bottom: 14px !important;
+}
+
+.chat-messages {
+    background-color: #fdf6ee !important;
+    border: 3px solid #ebd8c8 !important;
+    border-radius: 14px !important;
+    padding: 10px !important;
+    flex: 1 !important;
+    overflow-y: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+}
+
+.chat-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background-color: #c88868;
+    border-radius: 10px;
+}
+
+.chat-msg {
+    padding: 6px 12px !important;
+    border-radius: 14px !important;
+    word-break: break-word !important;
+    font-family: 'Fredoka', sans-serif !important;
+    font-size: 0.85rem !important;
+    max-width: 90% !important;
+}
+
+.chat-msg.self {
+    background: #e6f7d4 !important;
+    border: 2px solid #a3d930 !important;
+    align-self: flex-end !important;
+}
+
+.chat-msg.other {
+    background: #fcdbdc !important;
+    border: 2px solid #ff5555 !important;
+    align-self: flex-start !important;
+}
+
+.chat-msg-user {
+    font-weight: 800 !important;
+    font-size: 0.8rem !important;
+    color: #8e2b60 !important;
+    margin-bottom: 2px !important;
+}
+
+.chat-msg.self .chat-msg-user {
+    color: #4a750c !important;
+}
+
+.chat-msg-text {
+    color: #4a1830 !important;
+    font-weight: 700 !important;
+}
+
+.chat-msg-time {
+    font-size: 0.65rem !important;
+    color: #8e2b60 !important;
+    opacity: 0.6 !important;
+    margin-top: 4px !important;
+    text-align: right !important;
+}
+
+.chat-input-row {
+    display: flex !important;
+    gap: 8px !important;
+    margin-top: 12px !important;
+}
+
+.chat-input-row input {
+    flex: 1 !important;
+    background-color: #fbcbb1 !important;
+    border: 3px solid #c88868 !important;
+    border-radius: 12px !important;
+    color: #4a1830 !important;
+    font-family: 'Fredoka', sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 0.9rem !important;
+    padding: 8px 12px !important;
+    outline: none !important;
+}
+
+.chat-input-row input:focus {
+    border-color: #8e2b60 !important;
+}

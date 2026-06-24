@@ -69,21 +69,36 @@
                 <div class="grid" id="enemy-grid"></div>
             </div>
 
-            <!-- Battle Log Panel -->
-            <div class="battle-log-panel">
-                <h3>BATTLE LOG</h3>
-                <div class="log-messages" id="log-list">
-                    <p>Deploy ships on your fleet grid to configure target systems.</p>
-                </div>
-                <!-- Surrender section - hidden until opponent joins -->
-                <div id="surrender-section" style="margin-top: 20px; display:none;">
-                    <button id="btn-surrender" class="bubbly-game-btn red-game-btn">SURRENDER</button>
-                    <div id="surrender-confirm" style="display:none; margin-top:10px;">
-                        <p style="font-family:'Fredoka',sans-serif; font-weight:800; color:#8e2b60; font-size:1rem; text-align:center; margin-bottom:8px;">Sure? You will lose!</p>
-                        <div style="display:flex; gap:8px;">
-                            <button id="btn-surrender-yes" class="bubbly-game-btn red-game-btn" style="font-size:0.95rem; padding:8px 0;">YES, GIVE UP</button>
-                            <button id="btn-surrender-no" class="bubbly-game-btn green-game-btn" style="font-size:0.95rem; padding:8px 0;">CANCEL</button>
+            <!-- Right Sidebar (Logs & Chat) -->
+            <div class="game-sidebar">
+                <!-- Battle Log Panel -->
+                <div class="battle-log-panel">
+                    <h3>BATTLE LOG</h3>
+                    <div class="log-messages" id="log-list">
+                        <p>Deploy ships on your fleet grid to configure target systems.</p>
+                    </div>
+                    <!-- Surrender section - hidden until opponent joins -->
+                    <div id="surrender-section" style="margin-top: 20px; display:none;">
+                        <button id="btn-surrender" class="bubbly-game-btn red-game-btn">SURRENDER</button>
+                        <div id="surrender-confirm" style="display:none; margin-top:10px;">
+                            <p style="font-family:'Fredoka',sans-serif; font-weight:800; color:#8e2b60; font-size:1rem; text-align:center; margin-bottom:8px;">Sure? You will lose!</p>
+                            <div style="display:flex; gap:8px;">
+                                <button id="btn-surrender-yes" class="bubbly-game-btn red-game-btn" style="font-size:0.95rem; padding:8px 0;">YES, GIVE UP</button>
+                                <button id="btn-surrender-no" class="bubbly-game-btn green-game-btn" style="font-size:0.95rem; padding:8px 0;">CANCEL</button>
+                            </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Battle Live Chat Panel -->
+                <div class="battle-chat-panel" id="battle-chat-panel" style="display: none; margin-top: 20px;">
+                    <h3>BATTLE CHAT</h3>
+                    <div class="chat-messages" id="chat-messages-list">
+                        <p style="color:#c88868; font-style:italic; font-size:0.85rem; padding:8px 0; text-align:center;">No transmission signals yet.</p>
+                    </div>
+                    <div class="chat-input-row">
+                        <input type="text" id="chat-input-field" placeholder="Type transmission..." autocomplete="off">
+                        <button id="btn-send-chat" class="bubbly-game-btn green-game-btn" style="width: auto; padding: 0 16px; margin: 0; font-size: 0.95rem;">SEND</button>
                     </div>
                 </div>
             </div>
@@ -291,8 +306,10 @@
                 document.getElementById('btn-copy-code').style.display = 'none';
                 // AI is always present — show surrender immediately
                 document.getElementById('surrender-section').style.display = 'block';
+                document.getElementById('battle-chat-panel').style.display = 'none';
             } else {
                 document.getElementById('btn-copy-code').style.display = 'inline-flex';
+                document.getElementById('battle-chat-panel').style.display = 'block';
             }
 
             // If game already started (reconnect case), skip ship placement setup
@@ -653,6 +670,72 @@
             document.getElementById('end-overlay').style.display = "flex";
             playSound(isWinner ? 'ping' : 'miss');
         });
+
+        // --- Live Battle Chat Handling ---
+        const chatInputField = document.getElementById('chat-input-field');
+        const btnSendChat = document.getElementById('btn-send-chat');
+        const chatMessagesList = document.getElementById('chat-messages-list');
+
+        function sendGameChatMessage() {
+            const messageText = chatInputField.value.trim();
+            if (!messageText) return;
+
+            // Emit message to server for this specific room
+            socket.emit('send_game_message', {
+                roomId: roomId,
+                username: myName,
+                message: messageText
+            });
+
+            // Clear input
+            chatInputField.value = '';
+            playSound('click');
+        }
+
+        btnSendChat.addEventListener('click', sendGameChatMessage);
+        chatInputField.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendGameChatMessage();
+            }
+        });
+
+        // Receive chat transmission
+        socket.on('receive_game_message', (msg) => {
+            // Remove fallback text if it exists
+            const noSignalText = chatMessagesList.querySelector('p');
+            if (noSignalText && noSignalText.innerText.includes('No transmission')) {
+                noSignalText.remove();
+            }
+
+            const isSelf = (msg.username === myName);
+            const msgClass = isSelf ? 'self' : 'other';
+
+            const msgDiv = document.createElement('div');
+            msgDiv.classList.add('chat-msg', msgClass);
+
+            msgDiv.innerHTML = `
+                <div class="chat-msg-user">${msg.username}</div>
+                <div class="chat-msg-text">${escapeHTML(msg.message)}</div>
+                <div class="chat-msg-time">${msg.time}</div>
+            `;
+
+            chatMessagesList.appendChild(msgDiv);
+            // Scroll to newest message
+            chatMessagesList.scrollTop = chatMessagesList.scrollHeight;
+
+            if (!isSelf) {
+                playSound('ping');
+            }
+        });
+
+        function escapeHTML(str) {
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
     </script>
 </body>
 </html>
