@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battleship Online - Login</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* ===== BUBBLY LOGIN PAGE OVERRIDE ===== */
+        body {
+            background: #5b1f8a;
+            background-image:
+                radial-gradient(circle at 20% 20%, #7c2fa8 0%, transparent 40%),
+                radial-gradient(circle at 80% 80%, #3d1060 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, #4a1878 0%, transparent 60%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Fredoka', sans-serif;
+        }
+
+        .bubbly-login-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+        }
+
+        /* The main card */
+        .bubbly-login-card {
+            position: relative;
+            background-color: #fff4e6;
+            border: 8px solid #8e2b60;
+            border-radius: 28px;
+            box-shadow: 0 12px 0 #5f1840;
+            padding: 30px 40px 36px 40px;
+            width: 380px;
+            max-width: 92vw;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            margin-top: 36px;
+        }
+
+        /* Top title banner */
+        .bubbly-login-banner {
+            position: absolute;
+            top: -28px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(to bottom, #a3d930 0%, #6da317 100%);
+            border: 3px solid #4a750c;
+            border-radius: 22px;
+            box-shadow: 0 5px 0 #4a750c;
+            color: #ffffff;
+            font-size: 1.5rem;
+            font-weight: 800;
+            padding: 6px 28px;
+            white-space: nowrap;
+            letter-spacing: 1px;
+            text-shadow: -2px -2px 0 #3a5c0a, 2px -2px 0 #3a5c0a,
+                         -2px  2px 0 #3a5c0a, 2px  2px 0 #3a5c0a,
+                         0 4px 0 #3a5c0a;
+            z-index: 10;
+        }
+
+        /* Ship emoji animated */
+        .bubbly-ship {
+            font-size: 5rem;
+            margin: 10px 0 16px 0;
+            animation: bubbleFloat 3s ease-in-out infinite;
+            filter: drop-shadow(0 6px 8px rgba(95, 24, 64, 0.3));
+        }
+
+        @keyframes bubbleFloat {
+            0%   { transform: translateY(0px) rotate(0deg); }
+            50%  { transform: translateY(-12px) rotate(-3deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+
+        /* Label */
+        .bubbly-login-label {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #8e2b60;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        /* Input */
+        .bubbly-login-input {
+            width: 100%;
+            background-color: #fbcbb1;
+            border: 3px solid #c88868;
+            border-radius: 16px;
+            color: #4a1830;
+            font-family: 'Fredoka', sans-serif;
+            font-weight: 700;
+            font-size: 1.15rem;
+            padding: 12px 18px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.07);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .bubbly-login-input::placeholder {
+            color: #c08c72;
+            font-weight: 600;
+        }
+
+        .bubbly-login-input:focus {
+            outline: none;
+            border-color: #8e2b60;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.07), 0 0 0 3px rgba(142,43,96,0.15);
+        }
+
+        /* Continue button */
+        .bubbly-login-btn {
+            width: 80%;
+            background: linear-gradient(to bottom, #ffbe2b 0%, #ff7e00 100%);
+            border: 3px solid #b84000;
+            box-shadow: inset 0 5px 0 rgba(255,255,255,0.4), 0 7px 0 #b84000;
+            color: white;
+            font-family: 'Fredoka', sans-serif;
+            font-weight: 800;
+            font-size: 1.35rem;
+            padding: 11px 0;
+            border-radius: 22px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 0 #b84000;
+            transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.1s ease;
+        }
+
+        .bubbly-login-btn:hover {
+            filter: brightness(1.05);
+        }
+
+        .bubbly-login-btn:active {
+            transform: translateY(4px);
+            box-shadow: inset 0 3px 0 rgba(255,255,255,0.2), 0 3px 0 #b84000;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bubbly-login-wrapper">
+        <div class="bubbly-login-card">
+            <div class="bubbly-login-banner">BATTLESHIP ONLINE</div>
+
+            <div class="bubbly-ship">🚢</div>
+
+            <form id="loginForm" style="width:100%; display:flex; flex-direction:column; align-items:center; gap:0;">
+                <div class="bubbly-login-label">Enter Your Name</div>
+                <input type="text" id="username" class="bubbly-login-input" placeholder="Type your name..." required autocomplete="off">
+                <button type="submit" class="bubbly-login-btn">CONTINUE</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // when the player submits the name form, send it to the server
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const usernameInput = document.getElementById('username').value;
+
+            try {
+                // POST the name to /api/login — server checks for duplicates and assigns unique name
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: usernameInput })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // save the player's info to both sessionStorage and localStorage
+                    // sessionStorage clears on tab close, localStorage persists
+                    sessionStorage.setItem('userId', data.userId);
+                    sessionStorage.setItem('username', data.username);
+                    sessionStorage.setItem('score', data.score);
+                    localStorage.setItem('userId', data.userId);
+                    localStorage.setItem('username', data.username);
+                    localStorage.setItem('score', data.score);
+
+                    // go to the lobby
+                    window.location.href = 'lobby.html';
+                } else {
+                    alert("Error: " + (data.details || data.error));
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                alert("Cannot connect to server. Make sure backend is running!");
+            }
+        });
+    </script>
+</body>
+
+</html>

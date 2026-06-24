@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battleship Online - Lobby</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="lobby-container">
+        <!-- Lobby Header -->
+        <div class="lobby-header bubbly-header">
+            <h2>BATTLESHIP ONLINE</h2>
+            <div class="user-info">
+                <span class="bubbly-user">👤 <span id="display-name">Loading...</span></span>
+                <span id="display-score" style="display: none;">1200</span>
+                <button id="btn-change-name" onclick="changePlayer()" title="Change Name / New Player" style="
+                    background: linear-gradient(135deg, #c0392b, #922b21);
+                    border: none;
+                    border-radius: 20px;
+                    color: #fff;
+                    font-size: 0.75rem;
+                    font-weight: 700;
+                    padding: 6px 14px;
+                    cursor: pointer;
+                    letter-spacing: 0.5px;
+                    box-shadow: 0 3px 0 #7b241c;
+                    margin-left: 12px;
+                    text-transform: uppercase;
+                    transition: transform 0.1s, box-shadow 0.1s;
+                " onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter=''"
+                  onmousedown="this.style.transform='translateY(2px)';this.style.boxShadow='0 1px 0 #7b241c'"
+                  onmouseup="this.style.transform='';this.style.boxShadow='0 3px 0 #7b241c'">
+                    🔄 Change Name
+                </button>
+            </div>
+        </div>
+
+        <!-- Scoreboard Row -->
+        <div class="bubbly-score-row">
+            <div class="bubbly-score-card">
+                <div class="bubbly-score-label">GAMES PLAYED</div>
+                <div class="bubbly-score-value" id="stats-games-played">0</div>
+            </div>
+            <div class="bubbly-score-card">
+                <div class="bubbly-score-label">WINS</div>
+                <div class="bubbly-score-value" id="stats-wins">0</div>
+            </div>
+            <div class="bubbly-score-card">
+                <div class="bubbly-score-label">LOSSES</div>
+                <div class="bubbly-score-value" id="stats-losses">0</div>
+            </div>
+        </div>
+
+        <!-- Lobby Main Layout -->
+        <div class="lobby-main">
+            <!-- Play Modes Panel (Left) -->
+            <div class="game-setup-panel" style="display:flex; flex-direction:column; gap:24px; background:transparent; border:none; padding:0; box-shadow:none;">
+                <!-- Host Custom Match Card -->
+                <div class="bubbly-card">
+                    <div class="bubbly-banner">CREATE PARTY</div>
+                    <div class="bubbly-body">
+                        <p class="bubbly-text">You will receive a room code. Share room code with your friends and they can join the same party.</p>
+                        <button id="btn-open-create-modal" class="bubbly-btn orange-btn">Create</button>
+                    </div>
+                </div>
+
+                <!-- Join Private Match Card -->
+                <div class="bubbly-card">
+                    <div class="bubbly-banner">JOIN PARTY</div>
+                    <div class="bubbly-body">
+                        <div class="bubbly-label">Enter Room code</div>
+                        <input type="text" id="join-code-input" class="bubbly-input" placeholder="Room code:" autocomplete="off">
+                        <p class="bubbly-note">Note : You need to use same version and be on same server to join.</p>
+                        <button id="btn-join-code" class="bubbly-btn purple-btn">Join</button>
+                    </div>
+                </div>
+
+                <!-- Solo vs AI Match Card -->
+                <div class="bubbly-card">
+                    <div class="bubbly-banner">PLAY WITH COMPUTER</div>
+                    <div class="bubbly-body">
+                        <p class="bubbly-text">Play an offline practice mission against the computer bot to train your target patterns.</p>
+                        <button id="btn-play-ai" class="bubbly-btn orange-btn">Play</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rooms Panel (Middle) -->
+            <div class="rooms-panel bubbly-rooms-panel">
+                <h3 class="bubbly-rooms-title">AVAILABLE BATTLES</h3>
+                <div class="table-container">
+                    <table class="bubbly-table">
+                        <thead>
+                            <tr>
+                                <th>CAPTAIN</th>
+                                <th>GRID</th>
+                                <th>PLAYERS</th>
+                                <th>STATUS</th>
+                                <th>ACTION</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rooms-list">
+                            <tr>
+                                <td colspan="5" style="text-align:center; color:#c88868; padding-top:40px; font-weight:700;">Searching for active radar signals...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Custom Room Modal Overlay -->
+    <div class="modal-overlay" id="create-room-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>HOST CUSTOM BATTLE</h3>
+                <button class="modal-close" id="btn-close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Room Name -->
+                <div class="form-group">
+                    <label for="room-name-input">Battle Room Name</label>
+                    <input type="text" id="room-name-input" class="form-input" placeholder="E.g. Pacific Showdown" autocomplete="off">
+                </div>
+
+                <!-- Grid Size Selection -->
+                <div class="form-group">
+                    <label>Grid Size</label>
+                    <div class="grid-options">
+                        <button class="grid-btn" data-size="8x8">8x8</button>
+                        <button class="grid-btn active" data-size="10x10">10x10</button>
+                        <button class="grid-btn" data-size="12x12">12x12</button>
+                    </div>
+                </div>
+
+                <!-- Fleet Customization -->
+                <div class="form-group">
+                    <label>Fleet Configuration</label>
+                    <div class="ship-info-list" style="max-height: 180px; overflow-y: auto;">
+                        <!-- Carrier -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span>🚢 Carrier (Size 5)</span>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <button class="grid-btn" onclick="adjustCount('carrier', -1)" type="button" style="padding:2px 8px; width:24px; min-width:auto; height:24px; display:flex; align-items:center; justify-content:center;">-</button>
+                                <span id="carrier-count" style="font-weight:bold; width:15px; text-align:center;">1</span>
+                                <button class="grid-btn" onclick="adjustCount('carrier', 1)" type="button" style="padding:2px 8px; width:24px; min-width:auto; height:24px; display:flex; align-items:center; justify-content:center;">+</button>
+                            </div>
+                        </div>
+                        <!-- Battleship -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span>🚢 Battleship (Size 4)</span>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <button class="grid-btn" onclick="adjustCount('battleship', -1)" type="button" style="padding:2px 8px; width:24px; min-width:auto; height:24px; display:flex; align-items:center; justify-content:center;">-</button>
+                                <span id="battleship-count" style="font-weight:bold; width:15px; text-align:center;">1</span>
+                                <button class="grid-btn" onclick="adjustCount('battleship', 1)" type="button" style="padding:2px 8px; width:24px; min-width:auto; height:24px; display:flex; align-items:center; justify-content:center;">+</button>
+                            </div>
+                        </div>
+                        <!-- Cruiser -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span>🚢 Cruiser (Size 3)</span>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <button class="grid-btn" onclick="adjustCount('cruiser', -1)" type="button" style="padding:2px 8px; width:24px; min-width:auto; height:24px; display:flex; align-items:center; justify-content:center;">-</button>
+                                <span id="cruiser-count" style="font-weight:bold; width:15px; text-align:center;">1</span>
+                                <button class="grid-btn" onclick="adjustCount('cruiser', 1)" type="button" style="padding:2px 8px; width:24px; min-width:auto; height:24px; display:flex; align-items:center; justify-content:center;">+</button>
+                            </div>
+                        </div>
+                        <!-- Submarine -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span>🚢 Submarine (Size 3)</span>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <button class="grid-btn" onclick="adjustCount('submarine', -1)" type="button" style="padding:2px 8px; width:24px; min-width:auto; height:24px; display:flex; align-items:center; justify-content:center;">-</button>
+                                <span id="submarine-count" style="font-weight:bold; width:15px; text-align:center;">1</span>
+                                <button class="grid-btn" onclick="adjustCount('submarine', 1)" type="button" style="padding:2px 8px; width:24px; min-width:auto; height:24px; display:flex; align-items:center; justify-content:center;">+</button>
+                            </div>
+                        </div>
+                        <!-- Destroyer -->
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span>🚢 Destroyer (Size 2)</span>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <button class="grid-btn" onclick="adjustCount('destroyer', -1)" type="button" style="padding:2px 8px; width:24px; min-width:auto; height:24px; display:flex; align-items:center; justify-content:center;">-</button>
+                                <span id="destroyer-count" style="font-weight:bold; width:15px; text-align:center;">1</span>
+                                <button class="grid-btn" onclick="adjustCount('destroyer', 1)" type="button" style="padding:2px 8px; width:24px; min-width:auto; height:24px; display:flex; align-items:center; justify-content:center;">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="fleet-validation-status" style="font-size:0.75rem; color:var(--color-primary); margin-top:8px; font-weight:600; text-align:center;">Required Grid Cells: 17/30 Max (30% limit)</div>
+                </div>
+
+                <!-- Private Match Toggle -->
+                <div class="toggle-container">
+                    <div class="toggle-label-group">
+                        <span class="toggle-title">Private Room</span>
+                        <span class="toggle-desc">Make room joinable only via Room Code.</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="private-room-checkbox">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button id="btn-cancel-create" class="btn-continue" style="background:#2d3748; border-color:rgba(255,255,255,0.1); box-shadow:none;">CANCEL</button>
+                <button id="btn-launch-pvp" class="btn-continue">LAUNCH BATTLE</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // clears the session so the player can log in with a different name
+        function changePlayer() {
+            sessionStorage.removeItem('username');
+            sessionStorage.removeItem('userId');
+            sessionStorage.removeItem('score');
+            localStorage.removeItem('username');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('score');
+            window.location.href = 'index.html';
+        }
+
+        // read the player info that was saved during login
+        const myName = sessionStorage.getItem('username') || localStorage.getItem('username') || 'Unknown';
+        const myScore = sessionStorage.getItem('score') || localStorage.getItem('score') || '1200';
+        const myId = sessionStorage.getItem('userId') || localStorage.getItem('userId') || '0';
+        
+        document.getElementById('display-name').innerText = myName;
+        document.getElementById('display-score').innerText = myScore;
+
+        // fetch this player's stats from the DB and show them on the scoreboard
+        fetch(`/api/user-stats?username=${encodeURIComponent(myName)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.stats) {
+                    document.getElementById('stats-games-played').innerText = data.stats.games_played;
+                    document.getElementById('stats-wins').innerText = data.stats.wins;
+                    document.getElementById('stats-losses').innerText = data.stats.losses;
+                    // also update the score display with the latest value from DB
+                    if (data.stats.score) {
+                        document.getElementById('display-score').innerText = data.stats.score;
+                        sessionStorage.setItem('score', data.stats.score);
+                        localStorage.setItem('score', data.stats.score);
+                    }
+                }
+            })
+            .catch(err => console.error("Error loading user stats:", err));
+
+        // pre-fill the room name field with the player's name
+        document.getElementById('room-name-input').value = myName + "'s Match";
+
+        // connect to the socket server and send our userId and username so the server knows who we are
+        const socket = io({
+            auth: {
+                userId: myId,
+                username: myName
+            }
+        });
+
+        let selectedGridSize = "10x10";
+        let allActiveRooms = []; // keep a local copy to look up rooms by short code
+
+        // Ships Counts configuration
+        const shipCounts = {
+            carrier: 1,
+            battleship: 1,
+            cruiser: 1,
+            submarine: 1,
+            destroyer: 1
+        };
+
+        function getFleetValidationData() {
+            const sizeVal = parseInt(selectedGridSize.split('x')[0]) || 10;
+            const totalBoard = sizeVal * sizeVal;
+            
+            // Heuristic limits:
+            // 1. Max total ships count = grid size (8 for 8x8, 10 for 10x10, 12 for 12x12)
+            const maxShips = sizeVal;
+            // 2. Max total cells = 35% of board size (22 for 8x8, 35 for 10x10, 50 for 12x12)
+            const maxCells = Math.floor(totalBoard * 0.35);
+
+            const currentShips = shipCounts.carrier +
+                                 shipCounts.battleship +
+                                 shipCounts.cruiser +
+                                 shipCounts.submarine +
+                                 shipCounts.destroyer;
+
+            const currentCells = (shipCounts.carrier * 5) +
+                                 (shipCounts.battleship * 4) +
+                                 (shipCounts.cruiser * 3) +
+                                 (shipCounts.submarine * 3) +
+                                 (shipCounts.destroyer * 2);
+
+            return { sizeVal, totalBoard, maxShips, maxCells, currentShips, currentCells };
+        }
+
+        function updateFleetValidationStatus() {
+            const { maxShips, maxCells, currentShips, currentCells } = getFleetValidationData();
+            const statusEl = document.getElementById('fleet-validation-status');
+            if (statusEl) {
+                statusEl.innerHTML = `
+                    Ships count: ${currentShips}/${maxShips} Max<br>
+                    Grid cell usage: ${currentCells}/${maxCells} Max (35% limit)
+                `;
+                if (currentShips > maxShips || currentCells > maxCells) {
+                    statusEl.style.color = 'var(--color-danger)';
+                } else {
+                    statusEl.style.color = 'var(--color-primary)';
+                }
+            }
+        }
+
+        function adjustCount(shipType, delta) {
+            const newVal = shipCounts[shipType] + delta;
+            // Cap between 0 and 5, and ensure they have at least 1 ship in total
+            if (newVal >= 0 && newVal <= 5) {
+                // Calculate total count
+                let total = 0;
+                for (let type in shipCounts) {
+                    total += (type === shipType ? newVal : shipCounts[type]);
+                }
+                if (total > 0) {
+                    shipCounts[shipType] = newVal;
+                    document.getElementById(`${shipType}-count`).innerText = newVal;
+                    updateFleetValidationStatus();
+                }
+            }
+        }
+
+        // Grid Size Buttons Selection
+        const gridBtns = document.querySelectorAll('.grid-btn');
+        gridBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Only act on grid size selection buttons inside the form, not increment/decrement buttons
+                if (btn.hasAttribute('data-size')) {
+                    gridBtns.forEach(b => {
+                        if (b.hasAttribute('data-size')) b.classList.remove('active');
+                    });
+                    btn.classList.add('active');
+                    selectedGridSize = btn.getAttribute('data-size');
+                    updateFleetValidationStatus();
+                }
+            });
+        });
+
+        // --- Create Room Modal Events ---
+        const createModal = document.getElementById('create-room-modal');
+        const openModalBtn = document.getElementById('btn-open-create-modal');
+        const closeModalBtn = document.getElementById('btn-close-modal');
+        const cancelModalBtn = document.getElementById('btn-cancel-create');
+
+        function openModal() {
+            updateFleetValidationStatus();
+            createModal.classList.add('active');
+        }
+
+        function closeModal() {
+            createModal.classList.remove('active');
+        }
+
+        openModalBtn.addEventListener('click', openModal);
+        closeModalBtn.addEventListener('click', closeModal);
+        cancelModalBtn.addEventListener('click', closeModal);
+
+        // 1. Launch PVP Custom Room
+        document.getElementById('btn-launch-pvp').addEventListener('click', () => {
+            const { maxShips, maxCells, currentShips, currentCells } = getFleetValidationData();
+            if (currentShips > maxShips) {
+                alert(`Too many ships!\n\nYour current configuration has ${currentShips} ships, but a ${selectedGridSize} grid allows a maximum of ${maxShips} ships in total.\n\nPlease reduce the ship counts before launching.`);
+                return;
+            }
+            if (currentCells > maxCells) {
+                alert(`Fleet size too large!\n\nYour current configuration requires ${currentCells} cells, but a ${selectedGridSize} grid allows a maximum of ${maxCells} cells (35% limit) for ships.\n\nPlease reduce the ship counts before launching.`);
+                return;
+            }
+
+            const customRoomName = document.getElementById('room-name-input').value.trim() || (myName + "'s Match");
+            const isPrivateVal = document.getElementById('private-room-checkbox').checked;
+
+            socket.emit('create_room', {
+                roomName: customRoomName,
+                gridSize: selectedGridSize,
+                hostName: myName,
+                userId: myId,
+                shipsConfig: shipCounts,
+                isAI: false,
+                isPrivate: isPrivateVal
+            });
+            closeModal();
+        });
+
+        // 2. Play Against AI (Computer) - Direct Quick Launch
+        document.getElementById('btn-play-ai').addEventListener('click', () => {
+            const { maxShips, maxCells, currentShips, currentCells } = getFleetValidationData();
+            if (currentShips > maxShips) {
+                alert(`Too many ships!\n\nYour current configuration has ${currentShips} ships, but a ${selectedGridSize} grid allows a maximum of ${maxShips} ships in total.\n\nPlease open the CREATE ROOM modal to reduce ship counts, then try again.`);
+                return;
+            }
+            if (currentCells > maxCells) {
+                alert(`Fleet size too large!\n\nYour current configuration requires ${currentCells} cells, but a ${selectedGridSize} grid allows a maximum of ${maxCells} cells (35% limit) for ships.\n\nPlease open the CREATE ROOM modal to reduce ship counts, then try again.`);
+                return;
+            }
+
+            socket.emit('create_room', {
+                roomName: myName + " vs Bot",
+                gridSize: selectedGridSize,
+                hostName: myName,
+                userId: myId,
+                shipsConfig: shipCounts,
+                isAI: true,
+                isPrivate: true
+            });
+        });
+
+        // 3. Join Private Room via Code
+        const joinCodeInput = document.getElementById('join-code-input');
+        const joinCodeBtn = document.getElementById('btn-join-code');
+
+        function submitJoinCode() {
+            const code = joinCodeInput.value.trim().toLowerCase();
+            if (!code) {
+                alert("Please enter a room code first!");
+                return;
+            }
+
+            // Client-side resolution of room suffix to full Room ID
+            const matchedRoom = allActiveRooms.find(r => 
+                r.id.toLowerCase() === code || 
+                r.id.toLowerCase().endsWith(code)
+            );
+
+            if (matchedRoom) {
+                joinGame(matchedRoom.id);
+            } else {
+                // Fallback to sending code directly
+                joinGame(code);
+            }
+        }
+
+        joinCodeBtn.addEventListener('click', submitJoinCode);
+        joinCodeInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') submitJoinCode();
+        });
+
+        // Handle joining room error feedback from server
+        socket.on('join_error', (msg) => {
+            alert(msg);
+        });
+
+        // Server signals room creation
+        socket.on('room_created', (roomId) => {
+            window.location.href = `game.html?room=${roomId}&role=host`;
+        });
+
+        // 4. Update Available Rooms List Live
+        socket.on('update_rooms', (rooms) => {
+            allActiveRooms = rooms; // Cache rooms list locally
+            
+            const roomsList = document.getElementById('rooms-list');
+            roomsList.innerHTML = "";
+
+            // Filter out finished, single-player AI, and private rooms in lobby list
+            const displayRooms = rooms.filter(r => !r.isAI && !r.isPrivate && r.status !== 'Finished');
+
+            if(displayRooms.length === 0) {
+                roomsList.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#c88868; padding-top:40px; font-weight:700;">No public games available. Host a custom battle or enter a room code!</td></tr>`;
+                return;
+            }
+
+            displayRooms.forEach(room => {
+                const playerCount = room.opponentName ? "2/2" : "1/2";
+                const isHost = (room.hostId === socket.id || room.hostUserId == myId);
+                
+                let actionBtn = "";
+                if (room.status === 'Waiting') {
+                    if (isHost) {
+                        actionBtn = `<button class="bubbly-table-btn-disabled" disabled>YOURS</button>`;
+                    } else {
+                        actionBtn = `<button class="bubbly-table-btn" onclick="joinGame('${room.id}')">JOIN</button>`;
+                    }
+                } else {
+                    actionBtn = `<button class="bubbly-table-btn-disabled" disabled>PLAYING</button>`;
+                }
+
+                const statusClass = (room.status === 'Waiting') ? 'bubbly-status-waiting' : 'bubbly-status-playing';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>🚢 ${room.roomName}</td>
+                    <td>${room.gridSize}</td>
+                    <td>${playerCount}</td>
+                    <td class="${statusClass}">${room.status}</td>
+                    <td>${actionBtn}</td>
+                `;
+                roomsList.appendChild(tr);
+            });
+        });
+
+        // Handle game start redirection
+        socket.on('start_game_redirect', (startedRoom) => {
+            const role = (startedRoom.hostUserId == myId) ? 'host' : 'opponent';
+            window.location.href = `game.html?room=${startedRoom.id}&role=${role}`;
+        });
+
+        function joinGame(roomId) {
+            const room = allActiveRooms.find(r => r.id === roomId);
+            if (room && (room.hostUserId == myId || room.hostId === socket.id)) {
+                alert("You cannot join your own hosted room!");
+                return;
+            }
+            socket.emit('join_room', { roomId: roomId, playerName: myName, userId: myId });
+        }
+    </script>
+</body>
+</html>

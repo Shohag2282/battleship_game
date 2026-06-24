@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battleship Online - Arena</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <!-- Sound and Return Controls -->
+    <div style="position: absolute; top: 15px; left: 15px; display: flex; gap: 10px; z-index: 100;">
+        <button id="btn-sound" class="bubbly-ctrl-btn">🔊</button>
+        <button onclick="leaveGame()" class="bubbly-ctrl-btn" style="font-size: 0.95rem;">LOBBY</button>
+
+    </div>
+
+    <!-- Main Game Container -->
+    <div class="game-container">
+        <!-- Game Header -->
+        <div class="game-header">
+            <div class="player-label">
+                👤 <span id="player-name">Captain (You)</span> 
+                <span id="player-score" style="display: none;">1200</span>
+            </div>
+            
+            <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+                <div class="turn-indicator" id="turn-status">PREPARING FLEET</div>
+                <div class="room-code-badge" id="btn-copy-code" title="Click to copy Room Code">
+                    <span>CODE:</span>
+                    <span class="room-code-value" id="room-code-display">...</span>
+                    <span class="copy-icon">📋</span>
+                </div>
+            </div>
+
+            <div class="player-label text-right">
+                <span id="enemy-score" style="display: none;">1200</span>
+                <span id="enemy-name">Searching Radar...</span> 👤
+            </div>
+        </div>
+
+        <!-- Arena (Boards & Logs) -->
+        <div class="arena">
+            <!-- Your Board -->
+            <div class="board-wrapper">
+                <h3>YOUR FLEET</h3>
+                
+                <!-- Ship Placement Phase Controls -->
+                <div class="placement-controls" id="placement-panel">
+                    <div class="placement-row">
+                        <span class="deploy-label">Deploy Ships:</span>
+                        <button id="btn-rotate" class="btn-rotate">ROTATION: HORIZONTAL</button>
+                    </div>
+                    <div class="ship-select-list" id="ship-select-list">
+                        <!-- Populated dynamically based on room settings -->
+                    </div>
+                    <button id="btn-ready" class="bubbly-game-btn green-game-btn" style="margin-top: 10px;" disabled>READY FOR BATTLE</button>
+                </div>
+
+                <div class="grid" id="my-grid"></div>
+            </div>
+
+            <!-- Enemy Radar Board -->
+            <div class="board-wrapper">
+                <h3>ENEMY RADAR</h3>
+                <div style="height: 52px; width: 100%; display: flex; align-items: center; justify-content: center;" id="radar-hint">
+                    <span class="radar-hint-text" id="radar-hint-text">Awaiting coordinate deployment...</span>
+                </div>
+                <div class="grid" id="enemy-grid"></div>
+            </div>
+
+            <!-- Battle Log Panel -->
+            <div class="battle-log-panel">
+                <h3>BATTLE LOG</h3>
+                <div class="log-messages" id="log-list">
+                    <p>Deploy ships on your fleet grid to configure target systems.</p>
+                </div>
+                <!-- Surrender section - hidden until opponent joins -->
+                <div id="surrender-section" style="margin-top: 20px; display:none;">
+                    <button id="btn-surrender" class="bubbly-game-btn red-game-btn">SURRENDER</button>
+                    <div id="surrender-confirm" style="display:none; margin-top:10px;">
+                        <p style="font-family:'Fredoka',sans-serif; font-weight:800; color:#8e2b60; font-size:1rem; text-align:center; margin-bottom:8px;">Sure? You will lose!</p>
+                        <div style="display:flex; gap:8px;">
+                            <button id="btn-surrender-yes" class="bubbly-game-btn red-game-btn" style="font-size:0.95rem; padding:8px 0;">YES, GIVE UP</button>
+                            <button id="btn-surrender-no" class="bubbly-game-btn green-game-btn" style="font-size:0.95rem; padding:8px 0;">CANCEL</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Modal / Game Over Overlay -->
+    <div class="alert-overlay" id="end-overlay" style="display: none;">
+        <div class="alert-box">
+            <h2 id="end-title">VICTORY</h2>
+            <p id="end-message">You have destroyed the enemy fleet!</p>
+            <button class="bubbly-game-btn orange-game-btn" onclick="window.location.href='lobby.html'">RETURN TO LOBBY</button>
+        </div>
+    </div>
+
+    <div class="copied-toast" id="copied-toast">ROOM CODE COPIED!</div>
+
+    <script>
+        // Intentional leave — tells server to close room immediately
+        function leaveGame() {
+            if (typeof socket !== 'undefined' && roomId) {
+                socket.emit('leave_game', { roomId: roomId, userId: myId });
+                // Wait briefly for emit to reach server before page unloads
+                setTimeout(() => { window.location.href = 'lobby.html'; }, 200);
+            } else {
+                window.location.href = 'lobby.html';
+            }
+        }
+
+        // --- Web Audio Synthesizer ---
+
+        let soundEnabled = true;
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        document.getElementById('btn-sound').addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            document.getElementById('btn-sound').innerText = soundEnabled ? "🔊" : "🔇";
+        });
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                const now = audioCtx.currentTime;
+                if (type === 'click') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.frequency.setValueAtTime(600, now);
+                    osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } 
+                else if (type === 'hit') {
+                    // Exploding noise synthesis
+                    const bufferSize = audioCtx.sampleRate * 1.5;
+                    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = Math.random() * 2 - 1;
+                    }
+                    const noise = audioCtx.createBufferSource();
+                    noise.buffer = buffer;
+
+                    const filter = audioCtx.createBiquadFilter();
+                    filter.type = 'bandpass';
+                    filter.frequency.setValueAtTime(400, now);
+                    filter.frequency.exponentialRampToValueAtTime(80, now + 0.8);
+                    filter.Q.setValueAtTime(2.0, now);
+
+                    const gain = audioCtx.createGain();
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+
+                    noise.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(audioCtx.destination);
+
+                    noise.start(now);
+                    noise.stop(now + 1.5);
+                } 
+                else if (type === 'miss') {
+                    // Water splash synthesis
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.exponentialRampToValueAtTime(440, now + 0.4);
+
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.5);
+                }
+                else if (type === 'ping') {
+                    // Sonar ping
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.frequency.setValueAtTime(880, now);
+                    gain.gain.setValueAtTime(0.05, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.8);
+                }
+            } catch (err) {
+                console.error("Audio error:", err);
+            }
+        }
+
+        // --- Game Setup and Socket ---
+        var socket = io();
+        var urlParams = new URLSearchParams(window.location.search);
+        var roomId = urlParams.get('room');
+        var myName = sessionStorage.getItem('username') || localStorage.getItem('username') || 'Player';
+        var myId = sessionStorage.getItem('userId') || localStorage.getItem('userId') || '0';
+
+        const myRole = urlParams.get('role') || 'host'; // host or opponent
+
+        // Display Room Code Suffix (last part of room ID)
+        const codeDisplay = document.getElementById('room-code-display');
+        if (roomId) {
+            const parts = roomId.split('_');
+            const suffix = parts[parts.length - 1] || roomId;
+            codeDisplay.innerText = suffix.toUpperCase();
+        }
+
+        // Copy Room Code click handler
+        document.getElementById('btn-copy-code').addEventListener('click', () => {
+            if (!roomId) return;
+            const parts = roomId.split('_');
+            const shortCode = (parts[parts.length - 1] || roomId).toUpperCase();
+            
+            navigator.clipboard.writeText(shortCode).then(() => {
+                const toast = document.getElementById('copied-toast');
+                toast.classList.add('active');
+                playSound('ping');
+                setTimeout(() => {
+                    toast.classList.remove('active');
+                }, 2000);
+            }).catch(err => {
+                console.error("Failed to copy code:", err);
+            });
+        });
+
+        let gridSize = 10;
+        let isMyTurn = false;
+        let isReady = false;
+        let isGameStarted = false;
+        
+        document.getElementById('player-name').innerText = myName;
+
+        // Ship Placement Variables (populated dynamically on start)
+        const ships = [];
+
+        // Join game session — emit immediately AND on reconnect
+        function joinGameSession() {
+            socket.emit('join_game_session', { roomId: roomId, userId: myId, username: myName, role: myRole });
+        }
+        socket.on('connect', joinGameSession);
+        // If already connected, fire immediately
+        if (socket.connected) joinGameSession();
+
+
+        let selectedShipIndex = 0;
+        let isHorizontal = true;
+        let boardState = []; // 2D array representing ships grid
+
+
+        // Handle error feedback from server
+        socket.on('game_error', (msg) => {
+            alert(msg);
+            window.location.href = 'lobby.html';
+        });
+
+        // Receive room configurations
+        socket.on('init_game', (data) => {
+            // Prevent host from joining their own room as opponent
+            if (myRole === 'opponent' && data.hostUserId == myId) {
+                alert("You cannot join your own hosted room as an opponent!");
+                window.location.href = 'lobby.html';
+                return;
+            }
+
+            // Set opponent details (always update these even on reconnect)
+            const isHost = (data.hostName === myName);
+            const defaultOpponentName = data.isAI ? 'Computer (AI)' : 'Awaiting Opponent...';
+            document.getElementById('enemy-name').innerText = isHost ? (data.opponentName || defaultOpponentName) : data.hostName;
+            document.getElementById('player-score').innerText = isHost ? data.hostScore : data.opponentScore;
+            document.getElementById('enemy-score').innerText = isHost ? data.opponentScore : data.hostScore;
+
+            // Hide Room Code Display badge if playing against AI
+            if (data.isAI) {
+                document.getElementById('btn-copy-code').style.display = 'none';
+                // AI is always present — show surrender immediately
+                document.getElementById('surrender-section').style.display = 'block';
+            } else {
+                document.getElementById('btn-copy-code').style.display = 'inline-flex';
+            }
+
+            // If game already started (reconnect case), skip ship placement setup
+            if (isGameStarted) return;
+
+
+            gridSize = parseInt(data.gridSize);
+
+            // Generate ship placement config dynamically
+            ships.length = 0;
+            const sizes = { carrier: 5, battleship: 4, cruiser: 3, submarine: 3, destroyer: 2 };
+            const names = { carrier: 'Carrier', battleship: 'Battleship', cruiser: 'Cruiser', submarine: 'Submarine', destroyer: 'Destroyer' };
+            
+            const config = data.shipsConfig || { carrier: 1, battleship: 1, cruiser: 1, submarine: 1, destroyer: 1 };
+            for (let type in config) {
+                const count = config[type];
+                const size = sizes[type];
+                const name = names[type];
+                for (let i = 0; i < count; i++) {
+                    ships.push({
+                        name: count > 1 ? `${name} ${i+1}` : name,
+                        size: size,
+                        placed: false,
+                        coords: []
+                    });
+                }
+            }
+            if (ships.length === 0) {
+                ships.push(
+                    { name: 'Carrier', size: 5, placed: false, coords: [] },
+                    { name: 'Battleship', size: 4, placed: false, coords: [] },
+                    { name: 'Cruiser', size: 3, placed: false, coords: [] },
+                    { name: 'Submarine', size: 3, placed: false, coords: [] },
+                    { name: 'Destroyer', size: 2, placed: false, coords: [] }
+                );
+            }
+
+            // Create Ship selection buttons dynamically
+            const listEl = document.getElementById('ship-select-list');
+            listEl.innerHTML = "";
+            ships.forEach((ship, idx) => {
+                const btn = document.createElement('button');
+                btn.classList.add('ship-select-btn');
+                if (idx === 0) btn.classList.add('active');
+                btn.dataset.index = idx;
+                btn.dataset.size = ship.size;
+                btn.innerText = `${ship.name} (${ship.size})`;
+                btn.addEventListener('click', () => {
+                    if (ships[idx].placed) return;
+                    selectedShipIndex = idx;
+                    updateShipSelectionUI();
+                    playSound('click');
+                });
+                listEl.appendChild(btn);
+            });
+
+            selectedShipIndex = 0;
+
+            // Initialize local board matrix
+            boardState = [];
+            for (let r = 0; r < gridSize; r++) {
+                const row = [];
+                for (let c = 0; c < gridSize; c++) {
+                    row.push(null);
+                }
+                boardState.push(row);
+            }
+
+            createPlacementGrid();
+            createEnemyGrid(true); // Draw blank radar first
+            updateShipSelectionUI();
+        });
+
+
+        // Triggered when dynamic opponent connects
+        socket.on('opponent_joined', (data) => {
+            document.getElementById('enemy-name').innerText = data.opponentName;
+            document.getElementById('enemy-score').innerText = data.opponentScore;
+            // Show surrender button now that opponent has joined
+            document.getElementById('surrender-section').style.display = 'block';
+            
+            const logList = document.getElementById('log-list');
+            logList.innerHTML += `<p style="color:var(--color-primary); font-weight:600;">Opponent <strong>${data.opponentName}</strong> has connected. Deploy coordinates!</p>`;
+            logList.scrollTop = logList.scrollHeight;
+            playSound('ping');
+        });
+
+        // Opponent disconnected temporarily (reload/network issue)
+        socket.on('opponent_disconnected', (data) => {
+            const logList = document.getElementById('log-list');
+            logList.innerHTML += `<p style="color:#ff9900; font-weight:700;">⚠️ Opponent disconnected. Waiting 15 seconds for reconnect...</p>`;
+            logList.scrollTop = logList.scrollHeight;
+        });
+
+        // Opponent reconnected successfully
+        socket.on('player_reconnected', (data) => {
+            const logList = document.getElementById('log-list');
+            logList.innerHTML += `<p style="color:var(--color-success); font-weight:700;">✅ Opponent reconnected! Game continues.</p>`;
+            logList.scrollTop = logList.scrollHeight;
+            playSound('ping');
+        });
+
+
+        // 1. Draw Player's Grid during placement phase
+        function createPlacementGrid() {
+            const gridEl = document.getElementById('my-grid');
+            gridEl.innerHTML = "";
+            gridEl.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.setAttribute('data-row', r);
+                    cell.setAttribute('data-col', c);
+
+                    // Hover events for ship placement preview
+                    cell.addEventListener('mouseenter', () => handleCellHover(r, c, true));
+                    cell.addEventListener('mouseleave', () => handleCellHover(r, c, false));
+                    cell.addEventListener('click', () => handleCellClick(r, c));
+
+                    gridEl.appendChild(cell);
+                }
+            }
+        }
+
+        // Draw Enemy's Radar Grid
+        function createEnemyGrid(disabled = false) {
+            const gridEl = document.getElementById('enemy-grid');
+            gridEl.innerHTML = "";
+            gridEl.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.setAttribute('data-row', r);
+                    cell.setAttribute('data-col', c);
+
+                    if (!disabled) {
+                        cell.addEventListener('click', () => {
+                            if (!isMyTurn || cell.classList.contains('hit') || cell.classList.contains('miss')) return;
+                            playSound('click');
+                            socket.emit('fire_shot', { roomId: roomId, row: r, col: c, sender: socket.id });
+                        });
+                    }
+                    gridEl.appendChild(cell);
+                }
+            }
+        }
+
+        // --- Placement logic details ---
+        const rotateBtn = document.getElementById('btn-rotate');
+        rotateBtn.addEventListener('click', () => {
+            isHorizontal = !isHorizontal;
+            rotateBtn.innerText = isHorizontal ? "ROTATION: HORIZONTAL" : "ROTATION: VERTICAL";
+            playSound('click');
+        });
+
+        function updateShipSelectionUI() {
+            const btns = document.querySelectorAll('.ship-select-btn');
+            btns.forEach(btn => {
+                const idx = parseInt(btn.dataset.index);
+                btn.classList.remove('active');
+                btn.classList.remove('placed');
+                if (ships[idx].placed) {
+                    btn.classList.add('placed');
+                }
+                if (idx === selectedShipIndex) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        function getPlacementCells(r, c, size) {
+            const coords = [];
+            for (let i = 0; i < size; i++) {
+                const currRow = isHorizontal ? r : r + i;
+                const currCol = isHorizontal ? c + i : c;
+                
+                if (currRow >= gridSize || currCol >= gridSize) return null; // Out of bounds
+                coords.push({ r: currRow, c: currCol });
+            }
+            return coords;
+        }
+
+        function checkOverlap(coords) {
+            if (!coords) return true;
+            return coords.some(coord => boardState[coord.r][coord.c] !== null);
+        }
+
+        function handleCellHover(r, c, enter) {
+            if (isReady || selectedShipIndex === -1) return;
+            const ship = ships[selectedShipIndex];
+            const coords = getPlacementCells(r, c, ship.size);
+            const invalid = !coords || checkOverlap(coords);
+
+            if (coords) {
+                coords.forEach(coord => {
+                    const cell = document.querySelector(`#my-grid .cell[data-row="${coord.r}"][data-col="${coord.c}"]`);
+                    if (cell) {
+                        if (enter) {
+                            cell.classList.add(invalid ? 'placement-invalid' : 'placement-hover');
+                        } else {
+                            cell.classList.remove('placement-hover', 'placement-invalid');
+                        }
+                    }
+                });
+            }
+        }
+
+        function handleCellClick(r, c) {
+            if (isReady || selectedShipIndex === -1) return;
+            const ship = ships[selectedShipIndex];
+            const coords = getPlacementCells(r, c, ship.size);
+            
+            if (!coords || checkOverlap(coords)) {
+                return; // Sound feedback or shake can be done
+            }
+
+            // Place ship
+            coords.forEach(coord => {
+                boardState[coord.r][coord.c] = selectedShipIndex;
+                const cell = document.querySelector(`#my-grid .cell[data-row="${coord.r}"][data-col="${coord.c}"]`);
+                if (cell) {
+                    cell.classList.add('ship');
+                    cell.classList.remove('placement-hover');
+                }
+            });
+
+            ship.placed = true;
+            ship.coords = coords;
+
+            // Find next unplaced ship
+            selectedShipIndex = ships.findIndex(s => !s.placed);
+            updateShipSelectionUI();
+            playSound('click');
+
+            // If all ships are placed, enable Ready button
+            if (selectedShipIndex === -1) {
+                document.getElementById('btn-ready').removeAttribute('disabled');
+            }
+        }
+
+        // Ready Button Click
+        document.getElementById('btn-ready').addEventListener('click', () => {
+            if (isReady) return;
+            isReady = true;
+            document.getElementById('btn-ready').innerText = "AWAITING OPPONENT...";
+            document.getElementById('btn-ready').setAttribute('disabled', 'true');
+            rotateBtn.setAttribute('disabled', 'true');
+            playSound('ping');
+
+            // Send configuration to backend
+            const fleetCoords = ships.map(s => ({ name: s.name, coords: s.coords }));
+            socket.emit('player_ready', { roomId: roomId, fleet: fleetCoords });
+        });
+
+        // --- Game Play Loop ---
+        socket.on('start_battle', (data) => {
+            isGameStarted = true;
+            // Show surrender button (in case opponent joined before this event)
+            document.getElementById('surrender-section').style.display = 'block';
+            // Remove the placement panel
+            document.getElementById('placement-panel').style.display = "none";
+            document.getElementById('radar-hint-text').innerText = "CLick on radar coordinates to fire a shot.";
+            
+            // Re-draw enemy grid to handle pointer events
+            createEnemyGrid(false);
+
+            isMyTurn = (data.startPlayer === socket.id);
+            updateTurnUI();
+
+            const logList = document.getElementById('log-list');
+            logList.innerHTML += `<p style="color:var(--color-success); font-weight:700;">All units deployed! Radar initialized. Combat mode active.</p>`;
+            logList.scrollTop = logList.scrollHeight;
+            playSound('ping');
+        });
+
+        socket.on('shot_result', (data) => {
+            // data = { row, col, isHit, nextTurn, targetId, shooterName }
+            const isMeShooting = (data.shooterName === myName);
+            const gridId = isMeShooting ? 'enemy-grid' : 'my-grid';
+            
+            const cell = document.querySelector(`#${gridId} .cell[data-row="${data.row}"][data-col="${data.col}"]`);
+            if (cell) {
+                cell.classList.add(data.isHit ? 'hit' : 'miss');
+            }
+
+            // Sound logic
+            if (data.isHit) {
+                playSound('hit');
+            } else {
+                playSound('miss');
+            }
+
+            // Log output
+            const logList = document.getElementById('log-list');
+            const targetChar = String.fromCharCode(65 + data.row);
+            const targetNum = data.col + 1;
+            const statusText = data.isHit ? "<span style='color:var(--color-danger);'>HIT 💥</span>" : "<span style='color:var(--color-primary);'>MISS 🌊</span>";
+            logList.innerHTML += `<p><strong>${data.shooterName}</strong> fired at ${targetChar}${targetNum} - ${statusText}</p>`;
+            logList.scrollTop = logList.scrollHeight;
+
+            // Turn change
+            isMyTurn = (data.nextTurn === socket.id);
+            updateTurnUI();
+        });
+
+        function updateTurnUI() {
+            const turnStatus = document.getElementById('turn-status');
+            if (isMyTurn) {
+                turnStatus.innerText = "YOUR TURN";
+                turnStatus.style.background = "var(--color-primary)";
+                turnStatus.style.color = "var(--bg-dark)";
+                turnStatus.style.boxShadow = "0 0 20px var(--color-primary)";
+            } else {
+                turnStatus.innerText = "ENEMY'S TURN";
+                turnStatus.style.background = "var(--color-danger)";
+                turnStatus.style.color = "#fff";
+                turnStatus.style.boxShadow = "0 0 20px var(--color-danger)";
+            }
+        }
+
+        // Surrender Trigger - inline confirmation (no window.confirm)
+        const surrenderSection = document.getElementById('surrender-section');
+        const surrenderConfirm = document.getElementById('surrender-confirm');
+        document.getElementById('btn-surrender').addEventListener('click', () => {
+            surrenderConfirm.style.display = 'block';
+        });
+        document.getElementById('btn-surrender-no').addEventListener('click', () => {
+            surrenderConfirm.style.display = 'none';
+        });
+        document.getElementById('btn-surrender-yes').addEventListener('click', () => {
+            surrenderConfirm.style.display = 'none';
+            socket.emit('surrender', { roomId: roomId, userId: myId });
+        });
+
+        // Game Over Trigger
+        socket.on('game_over', (data) => {
+            // data = { winnerId, winnerName, finalScores }
+            isMyTurn = false;
+            isGameStarted = false;
+            
+            const isWinner = (data.winnerName === myName);
+            document.getElementById('end-title').innerText = isWinner ? "VICTORY" : "DEFEAT";
+            document.getElementById('end-title').style.color = isWinner ? "var(--color-success)" : "var(--color-danger)";
+            document.getElementById('end-message').innerHTML = isWinner 
+                ? `You have destroyed the enemy fleet!`
+                : `Your fleet has been completely destroyed.`;
+
+            // Save new score locally (for display purposes only, real stats are in DB)
+            if (data.finalScores[myName]) {
+                sessionStorage.setItem('score', data.finalScores[myName]);
+                localStorage.setItem('score', data.finalScores[myName]);
+            }
+
+            document.getElementById('end-overlay').style.display = "flex";
+            playSound(isWinner ? 'ping' : 'miss');
+        });
+    </script>
+</body>
+</html>

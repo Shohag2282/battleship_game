@@ -1,0 +1,17 @@
+=== BATTLESHIP DIAGNOSTIC REPORT ===
+Date: 2026-06-24T07:48:02.518Z
+
+Directory: d:\itransition-tasks\New folder (3)\battleshipT6\backend
+
+Checking Node Modules:
+- express: OK
+- cors: OK
+- mysql2: OK
+- socket.io: OK
+
+Checking MySQL Database Connection (host: 127.0.0.1, user: root):
+- Connection: SUCCESS
+- Tables found: game_rooms, lobby_chats, users
+
+Checking Port 5050 availability:
+- Port 5050: BLOCKED (Error: EADDRINUSE)
