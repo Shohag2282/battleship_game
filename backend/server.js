@@ -704,4 +704,5 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(5050, () => console.log('✅ Battleship server running at http://localhost:5050'));
+const PORT = process.env.PORT || 5050;
+server.listen(PORT, () => console.log(`✅ Battleship server running on port ${PORT}`));

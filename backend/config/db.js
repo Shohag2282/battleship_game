@@ -2,10 +2,12 @@
 const mysql = require('mysql2');
 
 const pool = mysql.createPool({
-    host: '127.0.0.1',
-    user: 'root',       // MySQL username (usually 'root' for local dev)
-    password: '',       // leave blank if using XAMPP without a password
-    database: 'battleship_db',
+    host: process.env.DB_HOST || '127.0.0.1',
+    user: process.env.DB_USER || 'root',       // MySQL username (usually 'root' for local dev)
+    password: process.env.DB_PASSWORD || '',       // leave blank if using XAMPP without a password
+    database: process.env.DB_NAME || 'battleship_db',
+    port: process.env.DB_PORT || 3306,
+    ssl: process.env.DB_HOST ? { rejectUnauthorized: false } : undefined,
     waitForConnections: true,
     connectionLimit: 10,  // max 10 simultaneous DB connections
     queueLimit: 0
